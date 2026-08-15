@@ -8,10 +8,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error, r2_score
 
-from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
 from sklearn.ensemble import RandomForestRegressor
 
 # =========================
@@ -19,87 +21,112 @@ from sklearn.ensemble import RandomForestRegressor
 # =========================
 df = pd.read_csv("data/train.csv")
 
-print(df.head())
-print(df.info())
-print(df.describe())
+# Drop ID column
+df.drop(columns=["Id"], inplace=True)
 
 # =========================
-# 3. DATA CLEANING
+# 3. TARGET
 # =========================
-
-# Handle missing values
-df = df.dropna(axis=1, thresh=0.7 * len(df))  # drop columns with too many NaNs
-df = df.fillna(df.median(numeric_only=True))
-
-# Encode categorical features
-for col in df.select_dtypes(include='object').columns:
-    le = LabelEncoder()
-    df[col] = le.fit_transform(df[col].astype(str))
+target = "SalePrice"
 
 # =========================
-# 4. FEATURE SELECTION
+# 4. HANDLE MISSING VALUES
 # =========================
-target = 'SalePrice'
 
+# Separate numeric and categorical
+num_cols = df.select_dtypes(include=["int64", "float64"]).columns
+cat_cols = df.select_dtypes(include=["object"]).columns
+
+# Fill numeric with median
+df[num_cols] = df[num_cols].fillna(df[num_cols].median())
+
+# Fill categorical with "None"
+df[cat_cols] = df[cat_cols].fillna("None")
+
+# =========================
+# 5. SPLIT FEATURES / TARGET
+# =========================
 X = df.drop(columns=[target])
 y = df[target]
 
 # =========================
-# 5. TRAIN-TEST SPLIT
+# 6. TRAIN-TEST SPLIT
 # =========================
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
 # =========================
-# 6. MODEL TRAINING
+# 7. PREPROCESSING PIPELINE
 # =========================
 
-# Linear Regression
-lr = LinearRegression()
-lr.fit(X_train, y_train)
-
-# Random Forest (better)
-rf = RandomForestRegressor(n_estimators=100, random_state=42)
-rf.fit(X_train, y_train)
-
-# =========================
-# 7. EVALUATION
-# =========================
-
-def evaluate(model, X_test, y_test):
-    preds = model.predict(X_test)
-    rmse = np.sqrt(mean_squared_error(y_test, preds))
-    r2 = r2_score(y_test, preds)
-    return rmse, r2
-
-lr_rmse, lr_r2 = evaluate(lr, X_test, y_test)
-rf_rmse, rf_r2 = evaluate(rf, X_test, y_test)
-
-print("Linear Regression RMSE:", lr_rmse, "R2:", lr_r2)
-print("Random Forest RMSE:", rf_rmse, "R2:", rf_r2)
+# OneHot for categorical
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("cat", OneHotEncoder(handle_unknown="ignore"), cat_cols)
+    ],
+    remainder="passthrough"
+)
 
 # =========================
-# 8. VISUALIZATION
+# 8. MODEL PIPELINE
+# =========================
+model = Pipeline(steps=[
+    ("preprocessing", preprocessor),
+    ("regressor", RandomForestRegressor(
+        n_estimators=200,
+        max_depth=10,
+        random_state=42
+    ))
+])
+
+# =========================
+# 9. TRAIN MODEL
+# =========================
+model.fit(X_train, y_train)
+
+# =========================
+# 10. EVALUATION
+# =========================
+preds = model.predict(X_test)
+
+rmse = np.sqrt(mean_squared_error(y_test, preds))
+r2 = r2_score(y_test, preds)
+
+print(f"RMSE: {rmse:.2f}")
+print(f"R2 Score: {r2:.4f}")
+
+# =========================
+# 11. FEATURE IMPORTANCE
 # =========================
 
+# Get feature names after encoding
+ohe = model.named_steps["preprocessing"].named_transformers_["cat"]
+encoded_cat_features = ohe.get_feature_names_out(cat_cols)
+
+all_features = list(encoded_cat_features) + list(num_cols)
+
+importances = model.named_steps["regressor"].feature_importances_
+
+feat_importance = pd.DataFrame({
+    "Feature": all_features,
+    "Importance": importances
+}).sort_values(by="Importance", ascending=False)
+
+# Plot top 15 features
 plt.figure(figsize=(10,6))
-sns.histplot(y, kde=True)
-plt.title("Sale Price Distribution")
+sns.barplot(
+    x="Importance",
+    y="Feature",
+    data=feat_importance.head(15)
+)
+plt.title("Top 15 Important Features")
 plt.show()
 
-# Correlation heatmap (top features)
-plt.figure(figsize=(12,8))
-corr = df.corr()
-sns.heatmap(corr, cmap='coolwarm')
-plt.title("Correlation Heatmap")
-plt.show()
-
-
-
-
-
+# =========================
+# 12. SAVE MODEL
+# =========================
 import pickle
 
 with open("model.pkl", "wb") as f:
-    pickle.dump(rf, f)
+    pickle.dump(model, f)
