@@ -94,3 +94,12 @@ corr = df.corr()
 sns.heatmap(corr, cmap='coolwarm')
 plt.title("Correlation Heatmap")
 plt.show()
+
+
+
+
+
+import pickle
+
+with open("model.pkl", "wb") as f:
+    pickle.dump(rf, f)
