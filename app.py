@@ -3,57 +3,65 @@ import pandas as pd
 import pickle
 
 # =========================
-# LOAD MODEL
+# LOAD TRAINED PIPELINE MODEL
 # =========================
 model = pickle.load(open("model.pkl", "rb"))
 
 # =========================
-# APP TITLE
+# PAGE CONFIG
 # =========================
-st.set_page_config(page_title="House Price Predictor", layout="centered")
+st.set_page_config(
+    page_title="House Price Predictor",
+    page_icon="🏠",
+    layout="centered"
+)
 
-st.title("🏠 House Price Prediction")
-st.markdown("Enter property details to estimate the house price.")
+st.title("🏠 House Price Prediction App")
+st.write("Enter property details to estimate the house price using a trained ML model.")
 
 # =========================
-# USER INPUTS
+# INPUT SECTION
 # =========================
-
-st.subheader("Property Features")
+st.header("Property Details")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    overall_qual = st.slider("Overall Quality (1–10)", 1, 10, 5)
-    gr_liv_area = st.number_input("Living Area (sq ft)", 500, 5000, 1500)
-    garage_cars = st.slider("Garage Capacity (cars)", 0, 4, 1)
+    overall_qual = st.slider("Overall Quality", 1, 10, 5)
+    gr_liv_area = st.number_input("Living Area (sq ft)", min_value=300, max_value=10000, value=1500)
+    garage_cars = st.slider("Garage Cars", 0, 4, 1)
 
 with col2:
-    total_bsmt_sf = st.number_input("Basement Area (sq ft)", 0, 3000, 800)
+    total_bsmt_sf = st.number_input("Basement Area (sq ft)", min_value=0, max_value=5000, value=800)
     full_bath = st.slider("Full Bathrooms", 0, 4, 1)
     year_built = st.number_input("Year Built", 1900, 2025, 2000)
 
 # =========================
 # CREATE INPUT DATAFRAME
+# IMPORTANT: column names MUST match training data
 # =========================
-input_data = pd.DataFrame({
-    "OverallQual": [overall_qual],
-    "GrLivArea": [gr_liv_area],
-    "GarageCars": [garage_cars],
-    "TotalBsmtSF": [total_bsmt_sf],
-    "FullBath": [full_bath],
-    "YearBuilt": [year_built]
-})
+input_df = pd.DataFrame([{
+    "OverallQual": overall_qual,
+    "GrLivArea": gr_liv_area,
+    "GarageCars": garage_cars,
+    "TotalBsmtSF": total_bsmt_sf,
+    "FullBath": full_bath,
+    "YearBuilt": year_built
+}])
 
 # =========================
 # PREDICTION
 # =========================
-if st.button("Predict Price"):
+st.divider()
+
+if st.button("Predict House Price"):
 
     try:
-        prediction = model.predict(input_data)[0]
+        prediction = model.predict(input_df)[0]
 
-        st.success(f"💰 Estimated House Price: ${prediction:,.0f}")
+        st.success(f"💰 Estimated Price: ${prediction:,.0f}")
+
+        st.info("Prediction is generated using a trained Machine Learning model (Random Forest Pipeline).")
 
     except Exception as e:
-        st.error("⚠️ Error in prediction. Make sure model matches input features.")
+        st.error("Prediction failed. Please check if model and input features match.")
