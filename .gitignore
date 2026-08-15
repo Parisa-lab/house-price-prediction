@@ -1,35 +1,62 @@
+# =========================
 # Python
+# =========================
+
 __pycache__/
 *.py[cod]
 *.pyo
 
-# Virtual environments
+
+# =========================
+# Virtual Environment
+# =========================
+
 .venv/
 venv/
 env/
 
+
+# =========================
 # Jupyter
+# =========================
+
 .ipynb_checkpoints/
 
-# Data files
+
+# =========================
+# Dataset
+# =========================
+
 data/*.csv
 data/*.zip
 data/*.xlsx
 
-# Trained models
-# models/*.pkl
-models/*.joblib
 
-# Environment variables
+# =========================
+# Environment Variables
+# =========================
+
 .env
 
-# OS files
+
+# =========================
+# Operating System
+# =========================
+
 .DS_Store
 Thumbs.db
 
+
+# =========================
 # IDE
+# =========================
+
 .vscode/
 .idea/
 
-# Streamlit
+
+# =========================
+# Streamlit Secrets
+# =========================
+
 .streamlit/secrets.toml
