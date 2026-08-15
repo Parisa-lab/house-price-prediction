@@ -17,7 +17,7 @@ data/*.zip
 data/*.xlsx
 
 # Trained models
-models/*.pkl
+# models/*.pkl
 models/*.joblib
 
 # Environment variables
