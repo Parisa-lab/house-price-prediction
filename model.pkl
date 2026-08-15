@@ -1,4 +1,0 @@
-Pipeline([
-    ("preprocessing", ColumnTransformer(...)),
-    ("model", RandomForestRegressor())
-])
