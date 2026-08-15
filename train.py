@@ -5,13 +5,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
 
 
 # =========================
@@ -24,6 +22,15 @@ PLOT_PATH = Path("feature_importance.png")
 
 TARGET = "SalePrice"
 
+FEATURES = [
+    "OverallQual",
+    "GrLivArea",
+    "GarageCars",
+    "TotalBsmtSF",
+    "FullBath",
+    "YearBuilt",
+]
+
 
 # =========================
 # 2. LOAD DATA
@@ -32,7 +39,7 @@ TARGET = "SalePrice"
 if not DATA_PATH.exists():
     raise FileNotFoundError(
         "data/train.csv was not found. "
-        "Download the Kaggle House Prices dataset "
+        "Please download the Kaggle House Prices dataset "
         "and place train.csv inside the data folder."
     )
 
@@ -45,96 +52,64 @@ print(
 
 
 # =========================
-# 3. REMOVE ID
+# 3. CHECK REQUIRED COLUMNS
 # =========================
 
-if "Id" in df.columns:
-    df = df.drop(columns=["Id"])
+required_columns = FEATURES + [TARGET]
+
+missing_columns = [
+    column
+    for column in required_columns
+    if column not in df.columns
+]
+
+if missing_columns:
+    raise ValueError(
+        "The following required columns are missing "
+        f"from the dataset: {missing_columns}"
+    )
 
 
 # =========================
-# 4. FEATURES / TARGET
+# 4. SELECT FEATURES / TARGET
 # =========================
 
-X = df.drop(columns=[TARGET])
+X = df[FEATURES]
 y = df[TARGET]
 
 
 # =========================
-# 5. IDENTIFY COLUMN TYPES
-# =========================
-
-numeric_features = X.select_dtypes(
-    include=["int64", "float64"]
-).columns.tolist()
-
-categorical_features = X.select_dtypes(
-    include=["object"]
-).columns.tolist()
-
-
-print(f"Numerical features: {len(numeric_features)}")
-print(f"Categorical features: {len(categorical_features)}")
-
-
-# =========================
-# 6. TRAIN / TEST SPLIT
+# 5. TRAIN / TEST SPLIT
 # =========================
 
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
     test_size=0.20,
-    random_state=42
+    random_state=42,
+)
+
+
+print(
+    f"\nTraining samples: {len(X_train)}"
+)
+
+print(
+    f"Testing samples: {len(X_test)}"
 )
 
 
 # =========================
-# 7. PREPROCESSING
+# 6. PREPROCESSING
 # =========================
 
-numeric_pipeline = Pipeline(
-    steps=[
-        (
-            "imputer",
-            SimpleImputer(strategy="median")
-        )
-    ]
-)
-
-categorical_pipeline = Pipeline(
-    steps=[
-        (
-            "imputer",
-            SimpleImputer(strategy="most_frequent")
-        ),
-        (
-            "encoder",
-            OneHotEncoder(
-                handle_unknown="ignore"
-            )
-        )
-    ]
-)
-
-preprocessor = ColumnTransformer(
-    transformers=[
-        (
-            "numeric",
-            numeric_pipeline,
-            numeric_features
-        ),
-        (
-            "categorical",
-            categorical_pipeline,
-            categorical_features
-        )
-    ]
+preprocessor = SimpleImputer(
+    strategy="median"
 )
 
 
 # =========================
-# 8. MODEL
+# 7. MODEL
 # =========================
 
 model = Pipeline(
@@ -149,29 +124,39 @@ model = Pipeline(
                 n_estimators=300,
                 max_depth=12,
                 random_state=42,
-                n_jobs=-1
+                n_jobs=-1,
             )
-        )
+        ),
     ]
 )
 
 
 # =========================
-# 9. TRAIN
+# 8. TRAIN MODEL
 # =========================
 
-print("\nTraining model...")
+print("\nTraining Random Forest model...")
 
-model.fit(X_train, y_train)
+model.fit(
+    X_train,
+    y_train
+)
 
 print("Training complete.")
 
 
 # =========================
-# 10. EVALUATE
+# 9. MAKE PREDICTIONS
 # =========================
 
-predictions = model.predict(X_test)
+predictions = model.predict(
+    X_test
+)
+
+
+# =========================
+# 10. EVALUATE MODEL
+# =========================
 
 rmse = mean_squared_error(
     y_test,
@@ -183,44 +168,51 @@ r2 = r2_score(
     predictions
 )
 
+
 print("\n" + "=" * 40)
 print("MODEL PERFORMANCE")
 print("=" * 40)
 
-print(f"RMSE: ${rmse:,.2f}")
-print(f"R² Score: {r2:.4f}")
+print(
+    f"RMSE: ${rmse:,.2f}"
+)
+
+print(
+    f"R² Score: {r2:.4f}"
+)
 
 
 # =========================
 # 11. FEATURE IMPORTANCE
 # =========================
 
-regressor = model.named_steps["regressor"]
+regressor = model.named_steps[
+    "regressor"
+]
 
 importances = regressor.feature_importances_
 
-# Get feature names after preprocessing
-preprocessing = model.named_steps["preprocessing"]
-
-feature_names = preprocessing.get_feature_names_out()
 
 feature_importance = (
     pd.DataFrame(
         {
-            "Feature": feature_names,
-            "Importance": importances
+            "Feature": FEATURES,
+            "Importance": importances,
         }
     )
     .sort_values(
         by="Importance",
-        ascending=False
+        ascending=False,
     )
 )
 
-print("\nTop 15 important features:")
+
+print("\n" + "=" * 40)
+print("FEATURE IMPORTANCE")
+print("=" * 40)
 
 print(
-    feature_importance.head(15).to_string(
+    feature_importance.to_string(
         index=False
     )
 )
@@ -230,30 +222,42 @@ print(
 # 12. FEATURE IMPORTANCE PLOT
 # =========================
 
-plt.figure(figsize=(10, 7))
+plt.figure(
+    figsize=(10, 6)
+)
 
 sns.barplot(
-    data=feature_importance.head(15),
+    data=feature_importance,
     x="Importance",
-    y="Feature"
+    y="Feature",
 )
 
 plt.title(
-    "Top 15 Feature Importances"
+    "Feature Importance"
+)
+
+plt.xlabel(
+    "Importance"
+)
+
+plt.ylabel(
+    "Feature"
 )
 
 plt.tight_layout()
 
+
 plt.savefig(
     PLOT_PATH,
     dpi=150,
-    bbox_inches="tight"
+    bbox_inches="tight",
 )
 
 plt.close()
 
+
 print(
-    f"\nFeature importance plot saved to "
+    f"\nFeature importance plot saved to: "
     f"{PLOT_PATH}"
 )
 
@@ -264,15 +268,21 @@ print(
 
 MODEL_PATH.parent.mkdir(
     parents=True,
-    exist_ok=True
+    exist_ok=True,
 )
 
 with open(
     MODEL_PATH,
     "wb"
 ) as file:
-    pickle.dump(model, file)
+    pickle.dump(
+        model,
+        file
+    )
+
 
 print(
-    f"Model saved to {MODEL_PATH}"
+    f"Model saved to: {MODEL_PATH}"
 )
+
+print("\nTraining pipeline completed successfully.")
