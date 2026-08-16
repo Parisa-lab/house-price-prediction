@@ -289,12 +289,6 @@ Streamlit Application
 Cloud Deployment
 ~~~
 
-## Live Application
-
-The deployed application is available here:
-
-https://house-price-prediction-vrtvevjqxqm7yuhvyx7z7v.streamlit.app/
-
 ## Author
 
 Parisa Barzegari 
