@@ -140,15 +140,14 @@ house-price-prediction/
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
+├── feature_importance.png
 │
 ├── data/
 │   └── train.csv
 │
-├── models/
-│   └── model.pkl
-│
-└── notebooks/
-    └── analysis.ipynb
+└── models/
+    └── model.pkl
+~~~
 ~~~
 
 ## Technologies
