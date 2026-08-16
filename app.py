@@ -22,13 +22,22 @@ st.set_page_config(
 
 MODEL_PATH = Path("models/model.pkl")
 
-FEATURE_IMPORTANCE = {
-    "Overall Quality": 0.585865,
-    "Living Area": 0.198440,
-    "Basement Area": 0.111882,
-    "Year Built": 0.058477,
-    "Garage Capacity": 0.031743,
-    "Full Bathrooms": 0.013594,
+FEATURES = [
+    "OverallQual",
+    "GrLivArea",
+    "GarageCars",
+    "TotalBsmtSF",
+    "FullBath",
+    "YearBuilt",
+]
+
+FEATURE_LABELS = {
+    "OverallQual": "Overall Quality",
+    "GrLivArea": "Living Area",
+    "GarageCars": "Garage Capacity",
+    "TotalBsmtSF": "Basement Area",
+    "FullBath": "Full Bathrooms",
+    "YearBuilt": "Year Built",
 }
 
 R2_SCORE = 0.8889
@@ -57,30 +66,82 @@ model = load_model()
 
 
 # =========================
-# 4. HEADER
+# 4. VALIDATE MODEL
+# =========================
+
+if "regressor" not in model.named_steps:
+    st.error(
+        "The saved model does not contain the expected "
+        "Random Forest regressor."
+    )
+    st.stop()
+
+
+regressor = model.named_steps["regressor"]
+
+if not hasattr(regressor, "feature_importances_"):
+    st.error(
+        "The saved model does not provide feature importance."
+    )
+    st.stop()
+
+
+if len(regressor.feature_importances_) != len(FEATURES):
+    st.error(
+        "The number of model features does not match "
+        "the expected feature set."
+    )
+    st.stop()
+
+
+# =========================
+# 5. EXTRACT FEATURE IMPORTANCE
+# =========================
+
+feature_importance = pd.DataFrame(
+    {
+        "Feature": FEATURES,
+        "Importance": regressor.feature_importances_,
+    }
+)
+
+feature_importance["Feature"] = (
+    feature_importance["Feature"]
+    .map(FEATURE_LABELS)
+)
+
+feature_importance = feature_importance.sort_values(
+    by="Importance",
+    ascending=True,
+)
+
+
+# =========================
+# 6. HEADER
 # =========================
 
 st.title("🏠 House Price Predictor")
 
 st.write(
     "Estimate the sale price of a house using "
-    "a machine learning model trained on the "
-    "Ames Housing dataset."
+    "a Random Forest regression model trained "
+    "on the Ames Housing dataset."
 )
 
 st.info(
-    "The model uses six important property features "
+    "The model uses six selected property features "
     "to generate an estimated sale price."
 )
 
 
 # =========================
-# 5. PROPERTY INPUTS
+# 7. PROPERTY INPUTS
 # =========================
 
 st.header("Property Details")
 
 col1, col2 = st.columns(2)
+
 
 with col1:
 
@@ -140,7 +201,7 @@ with col2:
 
 
 # =========================
-# 6. CREATE INPUT DATA
+# 8. CREATE INPUT DATA
 # =========================
 
 input_data = pd.DataFrame(
@@ -158,7 +219,7 @@ input_data = pd.DataFrame(
 
 
 # =========================
-# 7. PREDICTION
+# 9. PREDICTION
 # =========================
 
 st.divider()
@@ -181,7 +242,7 @@ if st.button(
 
 
 # =========================
-# 8. MODEL PERFORMANCE
+# 10. MODEL PERFORMANCE
 # =========================
 
 st.divider()
@@ -210,37 +271,25 @@ st.write(
 
 
 # =========================
-# 9. FEATURE IMPORTANCE
+# 11. FEATURE IMPORTANCE
 # =========================
 
 st.header("Feature Importance")
 
-importance_df = pd.DataFrame(
-    {
-        "Feature": FEATURE_IMPORTANCE.keys(),
-        "Importance": FEATURE_IMPORTANCE.values(),
-    }
-)
-
-importance_df = importance_df.sort_values(
-    "Importance",
-    ascending=True,
-)
-
 st.bar_chart(
-    importance_df.set_index("Feature")
+    feature_importance.set_index("Feature")
 )
 
+most_important_feature = feature_importance.iloc[-1]["Feature"]
 
 st.write(
-    "Overall Quality is the most influential "
-    "feature in the model, followed by Living Area "
-    "and Basement Area."
+    f"**{most_important_feature}** is the most influential "
+    "feature in the trained Random Forest model."
 )
 
 
 # =========================
-# 10. ABOUT THE MODEL
+# 12. ABOUT THE MODEL
 # =========================
 
 st.divider()
@@ -252,7 +301,7 @@ st.write(
 This project uses a Random Forest regression model
 to estimate residential property sale prices.
 
-The model was trained using six selected features:
+The model uses six selected features:
 
 - Overall Quality
 - Living Area
@@ -260,15 +309,12 @@ The model was trained using six selected features:
 - Basement Area
 - Full Bathrooms
 - Year Built
-
-The dataset is based on the Ames Housing dataset
-from the Kaggle House Prices competition.
 """
 )
 
 
 # =========================
-# 11. DISCLAIMER
+# 13. DISCLAIMER
 # =========================
 
 st.divider()
