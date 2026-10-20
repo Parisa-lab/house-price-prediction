@@ -1,33 +1,36 @@
+
 # House Price Prediction
 
-A machine learning project that predicts residential house sale prices using a Random Forest regression model.
+An end-to-end machine learning project that predicts residential house sale prices using two regression approaches: Random Forest and a neural network implemented with NumPy. The project includes data preprocessing, model training, evaluation, automated tests, feature importance analysis, and an interactive Streamlit application.
 
 ## Live Demo
 
 Try the deployed Streamlit application:
 
-https://house-price-prediction-vrtvevjqxqm7yuhvyx7z7v.streamlit.app/
+[House Price Prediction — Streamlit](https://house-price-prediction-vrtvevjqxqm7yuhvyx7z7v.streamlit.app/)
+
+The live deployment may not yet include the neural network integration. The updated application must be pushed and successfully redeployed before the live demo can be considered current.
 
 ## Overview
 
-This project uses the Ames Housing dataset to build a regression model for predicting house sale prices.
+This project uses the Ames Housing dataset to predict residential sale prices from six selected property features.
 
 The project demonstrates an end-to-end machine learning workflow:
 
-- Data loading
-- Feature selection
-- Missing-value handling
+- Data loading and validation
+- Feature selection and preprocessing
 - Train/test splitting
-- Model training
-- Model evaluation
+- Random Forest regression
+- Neural network implementation and training
+- Model evaluation against a mean-prediction baseline
 - Feature importance analysis
-- Model serialization
-- Interactive web application
-- Cloud deployment
+- Model serialization and loading
+- Input validation and automated testing
+- Interactive web application development
 
 ## Features
 
-The model uses six selected features from the original dataset:
+Both models use the same six input features:
 
 | Feature | Description |
 |---|---|
@@ -38,63 +41,93 @@ The model uses six selected features from the original dataset:
 | `FullBath` | Number of full bathrooms |
 | `YearBuilt` | Original construction year |
 
-These features provide a compact representation of important property characteristics while keeping the deployed application simple and easy to use.
+These features provide a compact representation of important property characteristics while keeping the application straightforward to use.
 
-## Machine Learning Model
+## Machine Learning Models
 
-The project uses a **Random Forest Regressor**.
+### 1. Random Forest Regressor
 
-The training pipeline consists of:
+The Random Forest model uses Scikit-learn and a preprocessing pipeline.
 
-1. Loading the Ames Housing dataset
-2. Selecting six features
-3. Handling missing numerical values using median imputation
-4. Splitting the data into training and test sets
-5. Training a Random Forest regression model
-6. Evaluating the model on unseen test data
-7. Analyzing feature importance
-8. Saving the trained model as a pickle file
+The training workflow includes:
 
-## Training Configuration
+1. Loading and validating the dataset.
+2. Selecting the six input features and `SalePrice` target.
+3. Handling missing numerical values using median imputation.
+4. Splitting the data into training and test sets.
+5. Training the Random Forest regressor.
+6. Evaluating predictions on held-out test data.
+7. Generating a feature importance plot.
+8. Saving the trained pipeline to `models/model.pkl`.
 
-The dataset is divided into:
-
-- **80% training data**
-- **20% test data**
-
-The model uses:
+Training configuration:
 
 - `n_estimators = 300`
 - `max_depth = 12`
 - `random_state = 42`
 - `n_jobs = -1`
 
-The fixed random state makes the experiment reproducible.
+### 2. Neural Network
+
+The second model is a fully connected neural network implemented using NumPy rather than a deep-learning framework.
+
+Architecture:
+
+- Input layer: 6 features
+- First hidden layer: 32 neurons with ReLU activation
+- Second hidden layer: 16 neurons with ReLU activation
+- Output layer: 1 predicted sale price
+
+The implementation includes:
+
+- He-style weight initialization for the ReLU hidden layers
+- Mini-batch gradient descent
+- Mean squared error loss
+- Feature and target standardization
+- Validation-based early stopping
+- Restoration of the best validation weights
+- Model parameter serialization in NumPy's `.npz` format
+- Input and artifact validation during inference
+
+The neural network training workflow uses separate training, validation, and test subsets. Scaling parameters are calculated from the training subset to avoid using validation or test information during preprocessing.
+
+The trained network is saved to `models/neural_network.npz`.
 
 ## Model Performance
 
-The model was evaluated on a held-out test set.
+The following results are from the current recorded model runs.
 
-| Metric | Result |
-|---|---:|
-| R² Score | 0.8889 |
-| RMSE | $29,190 |
+| Metric | Random Forest | Neural Network |
+|---|---:|---:|
+| Test R² | 0.8889 | 0.8678 |
+| Test RMSE | $29,190.00 | $31,844.77 |
+
+Both models were evaluated using the same 20% held-out test split with `random_state = 42`. The neural network uses an additional validation subset drawn from the training portion.
+
+The Random Forest currently has the higher recorded R² and lower RMSE. These results describe performance on this dataset and split; they do not establish that the same model will perform better on every dataset.
 
 ### R² Score
 
-The model achieved an R² score of **0.8889**.
+R² measures how much variation in the target values is explained by a model relative to a mean-prediction baseline. A score closer to 1 generally indicates better predictive performance.
 
-This means that the model explains approximately **88.9% of the variation** in house sale prices in the test set.
+### Root Mean Squared Error
 
-### RMSE
+RMSE measures prediction error in the target's units—in this case, dollars. It penalizes larger errors more heavily than smaller ones. Individual prediction errors can be substantially larger or smaller than the RMSE.
 
-The Root Mean Squared Error (RMSE) was approximately **$29,190**.
+## Baseline Comparison
 
-RMSE measures the typical magnitude of prediction error in the same units as the target variable. Individual prediction errors can be substantially larger or smaller.
+The neural network training script also evaluates a simple baseline that predicts the mean sale price of the training subset for every test example.
 
-## Feature Importance
+| Metric | Mean Baseline |
+|---|---:|
+| Test R² | -0.0008 |
+| Test RMSE | $87,613.78 |
 
-The trained Random Forest model produced the following feature importance values:
+The neural network substantially outperforms this baseline on the recorded test split. A baseline provides useful context because it shows whether a trained model improves on a simple prediction strategy.
+
+## Random Forest Feature Importance
+
+The Random Forest model produces the following feature importance values:
 
 | Feature | Importance |
 |---|---:|
@@ -105,50 +138,48 @@ The trained Random Forest model produced the following feature importance values
 | Garage Capacity | 3.2% |
 | Full Bathrooms | 1.4% |
 
-The results show that **Overall Quality** is the most influential feature in the model, followed by **Living Area** and **Basement Area**.
+Overall quality has the highest feature importance in the trained Random Forest, followed by above-ground living area and basement area.
+
+Feature importance measures how the fitted Random Forest uses features to reduce impurity. It does not establish causation and should not be interpreted as the effect of changing a property characteristic.
+
+The generated visualization is saved to `feature_importance.png`.
 
 ## Streamlit Application
 
-The trained model is integrated into an interactive Streamlit application.
+The Streamlit interface lets users select a model and enter the six property characteristics to receive an estimated sale price.
 
-Users can enter:
+The application provides:
 
-- Overall Quality
-- Living Area
-- Garage Capacity
-- Basement Area
-- Full Bathrooms
-- Year Built
+- Random Forest and neural network prediction options
+- Input controls for all six features
+- Estimated sale price
+- Recorded model performance metrics
+- Random Forest feature importance visualization
+- Project information and model descriptions
+- Model-loading and prediction error handling
 
-The application sends these values to the trained machine learning pipeline and returns an estimated sale price.
-
-The application also displays:
-
-- Model performance
-- R² score
-- RMSE
-- Feature importance
-- Project information
+The Random Forest and neural network artifacts are stored separately, allowing either model to be loaded independently.
 
 ## Project Structure
 
-~~~text
+```text
 house-price-prediction/
-│
 ├── app.py
 ├── train.py
+├── neural_network.py
+├── train_neural_network.py
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
 ├── feature_importance.png
-│
 ├── data/
 │   └── train.csv
-│
-└── models/
-    └── model.pkl
-~~~
-~~~
+├── models/
+│   ├── model.pkl
+│   └── neural_network.npz
+└── tests/
+    └── test_app.py
+```
 
 ## Technologies
 
@@ -159,137 +190,154 @@ house-price-prediction/
 - Matplotlib
 - Seaborn
 - Streamlit
-- Git
-- GitHub
+- Pytest
+- Git and GitHub
 
 ## Dataset
 
 This project uses the **House Prices: Advanced Regression Techniques** dataset from Kaggle.
 
-The dataset contains residential property information from Ames, Iowa, including information about property quality, size, construction, and other characteristics.
+The dataset contains residential property information from Ames, Iowa, including property quality, size, construction characteristics, and other attributes.
+
+The expected training file is `data/train.csv`. The dataset is not recreated by the training scripts; obtain it from the original dataset source if it is not already present.
 
 ## How to Run the Project
 
 ### 1. Clone the repository
 
-~~~bash
+Replace the placeholder with the actual repository URL.
+
+```bash
 git clone YOUR_REPOSITORY_URL
 cd house-price-prediction
-~~~
+```
 
 ### 2. Install dependencies
 
-~~~bash
-pip install -r requirements.txt
-~~~
+Use Python 3.10 or newer and install the project dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
 
 ### 3. Prepare the dataset
 
-Place the Kaggle `train.csv` file inside:
+Place the Kaggle training file at:
 
-~~~text
+```text
 data/train.csv
-~~~
+```
 
-### 4. Train the model
+The dataset must contain the six selected features and the `SalePrice` target.
 
-~~~bash
+### 4. Train the Random Forest model
+
+```bash
 python train.py
-~~~
+```
 
-This will:
+This command trains and evaluates the Random Forest pipeline, generates the feature importance plot, and saves the model to:
 
-- Train the Random Forest model
-- Evaluate the model
-- Generate the feature importance plot
-- Save the trained model to:
-
-~~~text
+```text
 models/model.pkl
-~~~
+```
 
-### 5. Run the Streamlit application
+### 5. Train the neural network
 
-~~~bash
-streamlit run app.py
-~~~
+```bash
+python train_neural_network.py
+```
 
-The application will open in your browser.
+This command validates the selected data, creates training, validation, and test subsets, trains the neural network, evaluates its performance against the mean baseline, and saves the artifact to:
+
+```text
+models/neural_network.npz
+```
+
+### 6. Run automated tests
+
+Install Pytest if it is not already available:
+
+```bash
+python -m pip install pytest
+```
+
+Then run the test suite from the repository root:
+
+```bash
+python -m pytest -v
+```
+
+The tests check model artifacts, feature order, finite predictions, Random Forest feature importances, neural network input validation, and missing-model handling.
+
+The current test suite has passed all eight tests in the development environment. Results can vary if the dependencies or model artifacts change.
+
+### 7. Run the Streamlit application
+
+```bash
+python -m streamlit run app.py
+```
+
+The application will display a local URL in the terminal. Open that URL in your browser.
 
 ## Limitations
 
-This project is intentionally designed as a compact machine learning project and therefore has several limitations.
-
 ### Limited Feature Set
 
-The original dataset contains many more variables than the six features used in this project.
+The original dataset contains many more variables than the six features used in this project. Additional features may improve predictions but would require corresponding preprocessing, training, testing, and application changes.
 
-Using only six features makes the application easier to understand and use, but it also means that potentially useful information is excluded from the model.
+### Dataset and Evaluation
 
-### Model Selection
+The reported results use a single train/test split. Cross-validation and evaluation on additional data would provide stronger evidence about generalization.
 
-Only a Random Forest Regressor is used in the current version.
+### Model Comparison
 
-Other models, such as Gradient Boosting, XGBoost, or LightGBM, could potentially achieve better predictive performance.
-
-### Evaluation
-
-The reported performance is based on a single train/test split.
-
-Cross-validation would provide a more robust estimate of how well the model generalizes to unseen data.
+The two models use different learning approaches and training procedures. A single held-out split provides a useful initial comparison but does not establish which approach is consistently superior.
 
 ### Real-World Use
 
-The predictions are intended for educational and portfolio purposes.
-
-They should not be interpreted as professional real-estate valuations or used as the sole basis for financial decisions.
+Predictions are intended for educational and portfolio purposes. They are not professional real-estate valuations and should not be used as the sole basis for financial decisions.
 
 ## Future Improvements
 
-Possible improvements include:
-
+- Cross-validation and repeated experiments
 - Hyperparameter tuning
-- K-fold cross-validation
-- Comparing multiple regression algorithms
-- Testing additional features
-- Feature engineering
-- Log-transforming the target variable
-- Model explainability with SHAP
-- Prediction uncertainty or prediction intervals
-- More advanced interactive visualizations
-- Automated model evaluation
-- Continuous deployment
+- Additional regression models
+- Feature engineering and target transformations
+- Model explainability methods
+- Prediction intervals and uncertainty estimates
+- Expanded automated tests
+- Continuous integration and deployment
+- Monitoring for changes in data and model performance
 
 ## Portfolio Project
 
-This project demonstrates the complete process of taking a machine learning model from a raw dataset to a deployed web application.
+This project demonstrates two approaches to regression and the steps required to turn trained models into an interactive application.
 
-The workflow is:
-
-~~~text
+```text
 Dataset
-   ↓
-Feature Selection
-   ↓
-Data Preprocessing
-   ↓
-Train/Test Split
-   ↓
-Random Forest Regression
-   ↓
-Model Evaluation
-   ↓
-Feature Importance
-   ↓
-Model Serialization
-   ↓
-Streamlit Application
-   ↓
-Cloud Deployment
-~~~
+   |
+Feature Selection and Validation
+   |
+Train / Validation / Test Splits
+   |
+   +-----------------------+
+   |                       |
+Random Forest          NumPy Neural Network
+   |                       |
+Evaluation             Evaluation
+   |                       |
+Saved Pipeline         Saved Parameters
+   |                       |
+   +-----------+-----------+
+               |
+        Streamlit Application
+               |
+        Interactive Predictions
+```
 
 ## Author
 
-Parisa Barzegari 
+Parisa Barzegari
 
 AI and Data Science portfolio project.

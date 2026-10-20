@@ -1,13 +1,19 @@
+
+"""Streamlit app for Random Forest and neural-network house-price prediction."""
+
 from pathlib import Path
 import pickle
 
 import pandas as pd
 import streamlit as st
 
+from neural_network import FEATURES, load_model as load_neural_network_model
+from neural_network import predict_price as predict_neural_network_price
 
-# =========================
+
+# ============================================================
 # 1. PAGE CONFIGURATION
-# =========================
+# ============================================================
 
 st.set_page_config(
     page_title="House Price Predictor",
@@ -16,20 +22,12 @@ st.set_page_config(
 )
 
 
-# =========================
-# 2. MODEL CONFIGURATION
-# =========================
+# ============================================================
+# 2. CONFIGURATION
+# ============================================================
 
-MODEL_PATH = Path("models/model.pkl")
-
-FEATURES = [
-    "OverallQual",
-    "GrLivArea",
-    "GarageCars",
-    "TotalBsmtSF",
-    "FullBath",
-    "YearBuilt",
-]
+RANDOM_FOREST_PATH = Path("models/model.pkl")
+NEURAL_NETWORK_PATH = Path("models/neural_network.npz")
 
 FEATURE_LABELS = {
     "OverallQual": "Overall Quality",
@@ -40,120 +38,170 @@ FEATURE_LABELS = {
     "YearBuilt": "Year Built",
 }
 
-R2_SCORE = 0.8889
-RMSE = 29190
+# Existing Random Forest metrics. Their test split has not yet been
+# verified against the neural network's shared test split.
+RANDOM_FOREST_R2 = 0.8889
+RANDOM_FOREST_RMSE = 29190.0
+
+# Metrics from the neural-network training run in this repository.
+NEURAL_NETWORK_R2 = 0.8678
+NEURAL_NETWORK_RMSE = 31844.77
 
 
-# =========================
-# 3. LOAD MODEL
-# =========================
+# ============================================================
+# 3. MODEL LOADING
+# ============================================================
 
 @st.cache_resource
-def load_model():
-    with open(MODEL_PATH, "rb") as file:
+def load_random_forest(model_path: str, modified_time: float):
+    """Load the existing serialized Random Forest pipeline."""
+    del modified_time  # Included in the cache key to detect file changes.
+
+    with open(model_path, "rb") as file:
         return pickle.load(file)
 
 
-if not MODEL_PATH.exists():
-    st.error(
-        "The trained model could not be found. "
-        "Please make sure models/model.pkl exists."
+@st.cache_resource
+def load_neural_network(model_path: str, modified_time: float):
+    """Load and validate the saved NumPy neural-network artifact."""
+    del modified_time  # Included in the cache key to detect file changes.
+
+    return load_neural_network_model(model_path)
+
+
+# ============================================================
+# 4. VALIDATE RANDOM FOREST ARTIFACT
+# ============================================================
+
+random_forest = None
+random_forest_error = None
+
+if RANDOM_FOREST_PATH.is_file():
+    try:
+        random_forest = load_random_forest(
+            str(RANDOM_FOREST_PATH),
+            RANDOM_FOREST_PATH.stat().st_mtime,
+        )
+
+        if not hasattr(random_forest, "named_steps"):
+            raise ValueError(
+                "The saved Random Forest model is not a pipeline."
+            )
+
+        if "regressor" not in random_forest.named_steps:
+            raise ValueError(
+                "The saved pipeline does not contain the expected regressor."
+            )
+
+        rf_regressor = random_forest.named_steps["regressor"]
+
+        if not hasattr(rf_regressor, "feature_importances_"):
+            raise ValueError(
+                "The Random Forest does not provide feature importance."
+            )
+
+        if len(rf_regressor.feature_importances_) != len(FEATURES):
+            raise ValueError(
+                "The Random Forest feature count does not match "
+                "the expected feature set."
+            )
+
+    except (OSError, ValueError, pickle.UnpicklingError) as exc:
+        random_forest = None
+        random_forest_error = str(exc)
+else:
+    random_forest_error = (
+        f"Random Forest model not found: {RANDOM_FOREST_PATH}"
     )
-    st.stop()
 
 
-model = load_model()
+# ============================================================
+# 5. VALIDATE NEURAL-NETWORK ARTIFACT
+# ============================================================
 
+neural_network = None
+neural_network_error = None
 
-# =========================
-# 4. VALIDATE MODEL
-# =========================
-
-if "regressor" not in model.named_steps:
-    st.error(
-        "The saved model does not contain the expected "
-        "Random Forest regressor."
+if NEURAL_NETWORK_PATH.is_file():
+    try:
+        neural_network = load_neural_network(
+            str(NEURAL_NETWORK_PATH),
+            NEURAL_NETWORK_PATH.stat().st_mtime,
+        )
+    except (OSError, ValueError) as exc:
+        neural_network_error = str(exc)
+else:
+    neural_network_error = (
+        f"Neural-network model not found: {NEURAL_NETWORK_PATH}"
     )
-    st.stop()
 
 
-regressor = model.named_steps["regressor"]
+# ============================================================
+# 6. HEADER AND MODEL SELECTION
+# ============================================================
 
-if not hasattr(regressor, "feature_importances_"):
-    st.error(
-        "The saved model does not provide feature importance."
-    )
-    st.stop()
-
-
-if len(regressor.feature_importances_) != len(FEATURES):
-    st.error(
-        "The number of model features does not match "
-        "the expected feature set."
-    )
-    st.stop()
-
-
-# =========================
-# 5. EXTRACT FEATURE IMPORTANCE
-# =========================
-
-feature_importance = pd.DataFrame(
-    {
-        "Feature": FEATURES,
-        "Importance": regressor.feature_importances_,
-    }
-)
-
-feature_importance["Feature"] = (
-    feature_importance["Feature"]
-    .map(FEATURE_LABELS)
-)
-
-feature_importance = feature_importance.sort_values(
-    by="Importance",
-    ascending=True,
-)
-
-
-# =========================
-# 6. HEADER
-# =========================
-
-st.title("🏠 House Price Predictor")
+st.title("House Price Predictor")
 
 st.write(
-    "Estimate the sale price of a house using "
-    "a Random Forest regression model trained "
-    "on the Ames Housing dataset."
+    "Estimate residential sale prices using two machine-learning "
+    "approaches trained on the Ames Housing dataset."
 )
 
-st.info(
-    "The model uses six selected property features "
-    "to generate an estimated sale price."
+available_models = []
+
+if random_forest is not None:
+    available_models.append("Random Forest")
+
+if neural_network is not None:
+    available_models.append("Neural Network")
+
+if not available_models:
+    st.error(
+        "No valid trained model is available. Check the model files "
+        "and training scripts."
+    )
+
+    if random_forest_error:
+        st.error(f"Random Forest: {random_forest_error}")
+
+    if neural_network_error:
+        st.error(f"Neural network: {neural_network_error}")
+
+    st.stop()
+
+selected_model = st.radio(
+    "Choose a prediction model",
+    options=available_models,
+    horizontal=True,
 )
 
+if selected_model == "Random Forest":
+    st.info(
+        "Random Forest uses an ensemble of decision trees to estimate "
+        "the sale price."
+    )
+else:
+    st.info(
+        "The neural network uses two fully connected hidden layers "
+        "with ReLU activation and saved feature/target scaling."
+    )
 
-# =========================
+
+# ============================================================
 # 7. PROPERTY INPUTS
-# =========================
+# ============================================================
 
 st.header("Property Details")
 
 col1, col2 = st.columns(2)
 
-
 with col1:
-
     overall_qual = st.slider(
         "Overall Quality",
         min_value=1,
         max_value=10,
         value=5,
-        help=(
-            "Overall material and finish quality "
-            "of the house."
-        ),
+        help="Overall material and finish quality of the house.",
     )
 
     gr_liv_area = st.number_input(
@@ -172,9 +220,7 @@ with col1:
         step=1,
     )
 
-
 with col2:
-
     total_bsmt_sf = st.number_input(
         "Basement Area (sq ft)",
         min_value=0,
@@ -199,11 +245,6 @@ with col2:
         step=1,
     )
 
-
-# =========================
-# 8. CREATE INPUT DATA
-# =========================
-
 input_data = pd.DataFrame(
     [
         {
@@ -214,94 +255,128 @@ input_data = pd.DataFrame(
             "FullBath": full_bath,
             "YearBuilt": year_built,
         }
-    ]
+    ],
+    columns=FEATURES,
 )
 
 
-# =========================
-# 9. PREDICTION
-# =========================
+# ============================================================
+# 8. PREDICTION
+# ============================================================
 
 st.divider()
 
-if st.button(
-    "Predict House Price",
-    use_container_width=True,
-):
+if st.button("Predict House Price", use_container_width=True):
+    try:
+        if selected_model == "Random Forest":
+            prediction = float(random_forest.predict(input_data)[0])
+        else:
+            prediction = predict_neural_network_price(
+                input_data.to_numpy(dtype=float),
+                neural_network,
+            )
 
-    prediction = model.predict(input_data)[0]
+        if not pd.notna(prediction):
+            raise ValueError("The model returned an invalid prediction.")
 
-    st.success(
-        f"Estimated Sale Price: ${prediction:,.0f}"
-    )
+        st.success(f"Estimated Sale Price: ${prediction:,.0f}")
 
-    st.metric(
-        label="Estimated Sale Price",
-        value=f"${prediction:,.0f}",
-    )
+        st.metric(
+            label="Estimated Sale Price",
+            value=f"${prediction:,.0f}",
+        )
+
+    except (ValueError, TypeError, FloatingPointError) as exc:
+        st.error(f"Could not generate a prediction: {exc}")
 
 
-# =========================
-# 10. MODEL PERFORMANCE
-# =========================
+# ============================================================
+# 9. MODEL PERFORMANCE
+# ============================================================
 
 st.divider()
-
 st.header("Model Performance")
 
-col1, col2 = st.columns(2)
+if selected_model == "Random Forest":
+    performance_r2 = RANDOM_FOREST_R2
+    performance_rmse = RANDOM_FOREST_RMSE
+else:
+    performance_r2 = NEURAL_NETWORK_R2
+    performance_rmse = NEURAL_NETWORK_RMSE
 
-with col1:
-    st.metric(
-        "R² Score",
-        f"{R2_SCORE:.4f}",
-    )
+metric_col1, metric_col2 = st.columns(2)
 
-with col2:
-    st.metric(
-        "RMSE",
-        f"${RMSE:,.0f}",
-    )
+with metric_col1:
+    st.metric("R² Score", f"{performance_r2:.4f}")
 
-st.write(
-    f"The model explains approximately "
-    f"**{R2_SCORE * 100:.1f}%** of the variation "
-    f"in house sale prices on the test set."
-)
-
-
-# =========================
-# 11. FEATURE IMPORTANCE
-# =========================
-
-st.header("Feature Importance")
-
-st.bar_chart(
-    feature_importance.set_index("Feature")
-)
-
-most_important_feature = feature_importance.iloc[-1]["Feature"]
+with metric_col2:
+    st.metric("RMSE", f"${performance_rmse:,.2f}")
 
 st.write(
-    f"**{most_important_feature}** is the most influential "
-    "feature in the trained Random Forest model."
+    f"The displayed R² score is **{performance_r2 * 100:.1f}%** "
+    "when expressed as a percentage."
+)
+
+st.caption(
+    "The displayed metrics come from separate recorded training runs. "
+    "Do not interpret differences between the models as a controlled "
+    "comparison until both are evaluated on the exact same test rows."
 )
 
 
-# =========================
-# 12. ABOUT THE MODEL
-# =========================
+# ============================================================
+# 10. RANDOM FOREST FEATURE IMPORTANCE
+# ============================================================
+
+if random_forest is not None:
+    st.divider()
+    st.header("Random Forest Feature Importance")
+
+    feature_importance = pd.DataFrame(
+        {
+            "Feature": FEATURES,
+            "Importance": (
+                random_forest.named_steps["regressor"]
+                .feature_importances_
+            ),
+        }
+    )
+
+    feature_importance["Feature"] = feature_importance["Feature"].map(
+        FEATURE_LABELS
+    )
+
+    feature_importance = feature_importance.sort_values(
+        by="Importance",
+        ascending=True,
+    )
+
+    st.bar_chart(feature_importance.set_index("Feature"))
+
+    most_important_feature = feature_importance.iloc[-1]["Feature"]
+
+    st.write(
+        f"**{most_important_feature}** has the highest feature "
+        "importance in the Random Forest model. Feature importance "
+        "describes the model's use of a feature, not causation."
+    )
+
+
+# ============================================================
+# 11. ABOUT THE PROJECT
+# ============================================================
 
 st.divider()
-
 st.header("About This Project")
 
 st.write(
     """
-This project uses a Random Forest regression model
-to estimate residential property sale prices.
+This project estimates residential sale prices using two models:
 
-The model uses six selected features:
+- **Random Forest:** an ensemble of decision trees.
+- **Neural Network:** a NumPy implementation with two ReLU hidden layers.
+
+Both models use the following six property features:
 
 - Overall Quality
 - Living Area
@@ -313,14 +388,13 @@ The model uses six selected features:
 )
 
 
-# =========================
-# 13. DISCLAIMER
-# =========================
+# ============================================================
+# 12. DISCLAIMER
+# ============================================================
 
 st.divider()
 
 st.caption(
     "For educational and demonstration purposes only. "
-    "The predicted price is not a professional "
-    "real-estate valuation."
+    "Predictions are estimates, not professional real-estate valuations."
 )
