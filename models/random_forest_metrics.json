@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "model_name": "random_forest",
+  "target": "SalePrice",
+  "features": [
+    "OverallQual",
+    "GrLivArea",
+    "GarageCars",
+    "TotalBsmtSF",
+    "FullBath",
+    "YearBuilt"
+  ],
+  "test_samples": 292,
+  "evaluation": {
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "metrics": {
+    "mae": 19169.852174608288,
+    "rmse": 29190.003410072764,
+    "r2": 0.8889152460971373
+  },
+  "artifact_sha256": "314dedde2d2c4cd2515cf6f5fcdd0562217bb31dd118fb89fa5c315e466aab9e"
+}

@@ -5,6 +5,9 @@ The Random Forest and neural network share the same held-out test set.
 Feature and target scaling are fitted on the neural network's training
 partition only to prevent data leakage.
 
+The trained model and its evaluation metrics are saved separately.
+The metrics file is linked to the exact model artifact by SHA-256.
+
 Run from the repository root:
     python train_neural_network.py
 """
@@ -17,6 +20,7 @@ from sklearn.dummy import DummyRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
+from model_metrics import save_model_metrics
 from neural_network import (
     FEATURES,
     HIDDEN_UNITS,
@@ -32,6 +36,7 @@ from neural_network import (
 
 DATA_PATH = Path("data/train.csv")
 MODEL_PATH = Path("models/neural_network.npz")
+METRICS_PATH = Path("models/neural_network_metrics.json")
 
 TEST_SIZE = 0.20
 VALIDATION_SIZE = 0.15
@@ -90,8 +95,8 @@ print(f"Target: {TARGET}")
 # 3. CREATE THE SHARED TEST SPLIT
 # ============================================================
 
-# This matches train.py's test split so both models are evaluated
-# on the same held-out records when the dataset row order is unchanged.
+# Match train.py so both models use the same held-out records,
+# provided the dataset row order has not changed.
 X_train_full, X_test, y_train_full, y_test = train_test_split(
     X,
     y,
@@ -99,7 +104,7 @@ X_train_full, X_test, y_train_full, y_test = train_test_split(
     random_state=RANDOM_STATE,
 )
 
-# Split validation data from the training partition only.
+# Create the validation set from training data only.
 X_train, X_val, y_train, y_val = train_test_split(
     X_train_full,
     y_train_full,
@@ -116,12 +121,11 @@ print(f"Testing samples:    {len(X_test)}")
 # 4. SCALE FEATURES AND TARGET
 # ============================================================
 
-# Store scaling parameters so the app can apply exactly the same
-# transformation to future user inputs.
+# Save scaling parameters so inference uses the same transformations.
 x_mean = X_train.mean(axis=0).to_numpy(dtype=np.float64)
 x_scale = X_train.std(axis=0, ddof=0).to_numpy(dtype=np.float64).copy()
 
-# Avoid division by zero if a feature has no variation in training data.
+# Avoid division by zero for constant features.
 x_scale[x_scale == 0] = 1.0
 
 y_mean = np.array([y_train.mean()], dtype=np.float64)
@@ -190,13 +194,15 @@ predictions = (
 y_test_values = y_test.to_numpy(dtype=np.float64)
 
 if not np.isfinite(predictions).all():
-    raise ValueError("The neural network produced non-finite test predictions.")
+    raise ValueError(
+        "The neural network produced non-finite test predictions."
+    )
 
-mae = mean_absolute_error(y_test_values, predictions)
+mae = float(mean_absolute_error(y_test_values, predictions))
 rmse = float(np.sqrt(mean_squared_error(y_test_values, predictions)))
-r2 = r2_score(y_test_values, predictions)
+r2 = float(r2_score(y_test_values, predictions))
 
-# A mean-prediction baseline helps show whether the network adds value.
+# Compare against a baseline that predicts the training-target mean.
 baseline = DummyRegressor(strategy="mean")
 baseline.fit(
     np.zeros((len(y_train), 1), dtype=np.float64),
@@ -251,4 +257,27 @@ np.savez(
 )
 
 print(f"\nNeural-network model saved to: {MODEL_PATH}")
-print("Training and evaluation completed successfully.")
+
+
+# ============================================================
+# 8. SAVE EVALUATION METRICS
+# ============================================================
+
+save_model_metrics(
+    METRICS_PATH,
+    MODEL_PATH,
+    model_name="neural_network",
+    target=TARGET,
+    features=list(FEATURES),
+    metrics={
+        "mae": mae,
+        "rmse": rmse,
+        "r2": r2,
+    },
+    test_samples=len(X_test),
+    test_size=TEST_SIZE,
+    random_state=RANDOM_STATE,
+)
+
+print(f"Evaluation metrics saved to: {METRICS_PATH}")
+print("\nNeural-network training completed successfully.")

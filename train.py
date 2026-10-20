@@ -1,26 +1,37 @@
-from pathlib import Path
+
+"""Train, evaluate, and save the Random Forest house-price model."""
+
 import pickle
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+)
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
+from model_metrics import save_model_metrics
 
-# =========================
+
+# ============================================================
 # 1. CONFIGURATION
-# =========================
+# ============================================================
 
 DATA_PATH = Path("data/train.csv")
 MODEL_PATH = Path("models/model.pkl")
+METRICS_PATH = Path("models/random_forest_metrics.json")
 PLOT_PATH = Path("feature_importance.png")
 
 TARGET = "SalePrice"
+TEST_SIZE = 0.20
+RANDOM_STATE = 42
 
 FEATURES = [
     "OverallQual",
@@ -32,199 +43,122 @@ FEATURES = [
 ]
 
 
-# =========================
-# 2. LOAD DATA
-# =========================
+# ============================================================
+# 2. LOAD AND VALIDATE DATA
+# ============================================================
 
-if not DATA_PATH.exists():
+if not DATA_PATH.is_file():
     raise FileNotFoundError(
-        "data/train.csv was not found. "
-        "Please download the Kaggle House Prices dataset "
-        "and place train.csv inside the data folder."
+        f"Dataset not found: {DATA_PATH}. "
+        "Download the Kaggle House Prices dataset and place "
+        "train.csv inside the data directory."
     )
 
 df = pd.read_csv(DATA_PATH)
 
-print(
-    f"Dataset loaded: "
-    f"{df.shape[0]} rows × {df.shape[1]} columns"
-)
-
-
-# =========================
-# 3. CHECK REQUIRED COLUMNS
-# =========================
-
 required_columns = FEATURES + [TARGET]
-
 missing_columns = [
-    column
-    for column in required_columns
-    if column not in df.columns
+    column for column in required_columns if column not in df.columns
 ]
 
 if missing_columns:
     raise ValueError(
-        "The following required columns are missing "
-        f"from the dataset: {missing_columns}"
+        f"Dataset is missing required columns: {missing_columns}"
     )
 
-
-# =========================
-# 4. SELECT FEATURES / TARGET
-# =========================
-
 X = df[FEATURES]
-y = df[TARGET]
+y = pd.to_numeric(df[TARGET], errors="coerce")
+
+if y.isna().any() or not (y > 0).all():
+    raise ValueError("SalePrice must contain valid positive numeric values.")
+
+print(f"Dataset loaded: {df.shape[0]} rows × {df.shape[1]} columns")
 
 
-# =========================
-# 5. TRAIN / TEST SPLIT
-# =========================
+# ============================================================
+# 3. TRAIN / TEST SPLIT
+# ============================================================
 
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
-    test_size=0.20,
-    random_state=42,
+    test_size=TEST_SIZE,
+    random_state=RANDOM_STATE,
 )
 
-
-print(
-    f"\nTraining samples: {len(X_train)}"
-)
-
-print(
-    f"Testing samples: {len(X_test)}"
-)
+print(f"\nTraining samples: {len(X_train)}")
+print(f"Testing samples:  {len(X_test)}")
 
 
-# =========================
-# 6. PREPROCESSING
-# =========================
-
-preprocessor = SimpleImputer(
-    strategy="median"
-)
-
-
-# =========================
-# 7. MODEL
-# =========================
+# ============================================================
+# 4. BUILD AND TRAIN THE MODEL
+# ============================================================
 
 model = Pipeline(
     steps=[
-        (
-            "preprocessing",
-            preprocessor
-        ),
+        ("preprocessing", SimpleImputer(strategy="median")),
         (
             "regressor",
             RandomForestRegressor(
                 n_estimators=300,
                 max_depth=12,
-                random_state=42,
+                random_state=RANDOM_STATE,
                 n_jobs=-1,
-            )
+            ),
         ),
     ]
 )
 
-
-# =========================
-# 8. TRAIN MODEL
-# =========================
-
 print("\nTraining Random Forest model...")
-
-model.fit(
-    X_train,
-    y_train
-)
-
+model.fit(X_train, y_train)
 print("Training complete.")
 
 
-# =========================
-# 9. MAKE PREDICTIONS
-# =========================
+# ============================================================
+# 5. EVALUATE THE MODEL
+# ============================================================
 
-predictions = model.predict(
-    X_test
-)
+predictions = model.predict(X_test)
 
-
-# =========================
-# 10. EVALUATE MODEL
-# =========================
-
-rmse = mean_squared_error(
-    y_test,
-    predictions
-) ** 0.5
-
-r2 = r2_score(
-    y_test,
-    predictions
-)
-
+mae = float(mean_absolute_error(y_test, predictions))
+rmse = float(mean_squared_error(y_test, predictions) ** 0.5)
+r2 = float(r2_score(y_test, predictions))
 
 print("\n" + "=" * 40)
-print("MODEL PERFORMANCE")
+print("RANDOM FOREST — TEST PERFORMANCE")
 print("=" * 40)
-
-print(
-    f"RMSE: ${rmse:,.2f}"
-)
-
-print(
-    f"R² Score: {r2:.4f}"
-)
+print(f"MAE:  ${mae:,.2f}")
+print(f"RMSE: ${rmse:,.2f}")
+print(f"R²:   {r2:.4f}")
 
 
-# =========================
-# 11. FEATURE IMPORTANCE
-# =========================
+# ============================================================
+# 6. FEATURE IMPORTANCE
+# ============================================================
 
-regressor = model.named_steps[
-    "regressor"
-]
-
-importances = regressor.feature_importances_
-
+regressor = model.named_steps["regressor"]
 
 feature_importance = (
     pd.DataFrame(
         {
             "Feature": FEATURES,
-            "Importance": importances,
+            "Importance": regressor.feature_importances_,
         }
     )
-    .sort_values(
-        by="Importance",
-        ascending=False,
-    )
+    .sort_values("Importance", ascending=False)
 )
-
 
 print("\n" + "=" * 40)
 print("FEATURE IMPORTANCE")
 print("=" * 40)
-
-print(
-    feature_importance.to_string(
-        index=False
-    )
-)
+print(feature_importance.to_string(index=False))
 
 
-# =========================
-# 12. FEATURE IMPORTANCE PLOT
-# =========================
+# ============================================================
+# 7. SAVE FEATURE IMPORTANCE PLOT
+# ============================================================
 
-plt.figure(
-    figsize=(10, 6)
-)
+plt.figure(figsize=(10, 6))
 
 sns.barplot(
     data=feature_importance,
@@ -232,57 +166,43 @@ sns.barplot(
     y="Feature",
 )
 
-plt.title(
-    "Feature Importance"
-)
-
-plt.xlabel(
-    "Importance"
-)
-
-plt.ylabel(
-    "Feature"
-)
-
+plt.title("Random Forest Feature Importance")
+plt.xlabel("Importance")
+plt.ylabel("Feature")
 plt.tight_layout()
 
-
-plt.savefig(
-    PLOT_PATH,
-    dpi=150,
-    bbox_inches="tight",
-)
-
+plt.savefig(PLOT_PATH, dpi=150, bbox_inches="tight")
 plt.close()
 
-
-print(
-    f"\nFeature importance plot saved to: "
-    f"{PLOT_PATH}"
-)
+print(f"\nFeature importance plot saved to: {PLOT_PATH}")
 
 
-# =========================
-# 13. SAVE MODEL
-# =========================
+# ============================================================
+# 8. SAVE MODEL AND EVALUATION METRICS
+# ============================================================
 
-MODEL_PATH.parent.mkdir(
-    parents=True,
-    exist_ok=True,
-)
+MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-with open(
+with MODEL_PATH.open("wb") as file:
+    pickle.dump(model, file)
+
+print(f"Model saved to: {MODEL_PATH}")
+
+save_model_metrics(
+    METRICS_PATH,
     MODEL_PATH,
-    "wb"
-) as file:
-    pickle.dump(
-        model,
-        file
-    )
-
-
-print(
-    f"Model saved to: {MODEL_PATH}"
+    model_name="random_forest",
+    target=TARGET,
+    features=FEATURES,
+    metrics={
+        "mae": mae,
+        "rmse": rmse,
+        "r2": r2,
+    },
+    test_samples=len(X_test),
+    test_size=TEST_SIZE,
+    random_state=RANDOM_STATE,
 )
 
-print("\nTraining pipeline completed successfully.")
+print(f"Evaluation metrics saved to: {METRICS_PATH}")
+print("\nRandom Forest training completed successfully.")

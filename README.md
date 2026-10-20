@@ -1,7 +1,6 @@
-
 # House Price Prediction
 
-An end-to-end machine learning project that predicts residential house sale prices using two regression approaches: Random Forest and a neural network implemented with NumPy. The project includes data preprocessing, model training, evaluation, automated tests, feature importance analysis, and an interactive Streamlit application.
+An end-to-end machine learning portfolio project that predicts residential house sale prices using two regression approaches: a Scikit-learn Random Forest and a neural network implemented with NumPy. The project includes data validation, model training, evaluation, automated testing, feature importance analysis, and an interactive Streamlit application.
 
 ## Live Demo
 
@@ -9,7 +8,7 @@ Try the deployed Streamlit application:
 
 [House Price Prediction — Streamlit](https://house-price-prediction-vrtvevjqxqm7yuhvyx7z7v.streamlit.app/)
 
-The live deployment may not yet include the neural network integration. The updated application must be pushed and successfully redeployed before the live demo can be considered current.
+**Deployment status:** The live deployment may not yet contain the latest integrated application and evaluation-metrics changes. The updated code must be pushed and successfully redeployed before the live demo can be considered current.
 
 ## Overview
 
@@ -19,13 +18,14 @@ The project demonstrates an end-to-end machine learning workflow:
 
 - Data loading and validation
 - Feature selection and preprocessing
-- Train/test splitting
+- Reproducible train/test splitting
 - Random Forest regression
 - Neural network implementation and training
-- Model evaluation against a mean-prediction baseline
+- Evaluation against a mean-prediction baseline
 - Feature importance analysis
 - Model serialization and loading
-- Input validation and automated testing
+- Model-specific evaluation-metrics persistence
+- Automated testing
 - Interactive web application development
 
 ## Features
@@ -47,18 +47,19 @@ These features provide a compact representation of important property characteri
 
 ### 1. Random Forest Regressor
 
-The Random Forest model uses Scikit-learn and a preprocessing pipeline.
+The Random Forest model uses Scikit-learn with a preprocessing pipeline.
 
-The training workflow includes:
+The training workflow:
 
-1. Loading and validating the dataset.
-2. Selecting the six input features and `SalePrice` target.
-3. Handling missing numerical values using median imputation.
-4. Splitting the data into training and test sets.
-5. Training the Random Forest regressor.
-6. Evaluating predictions on held-out test data.
-7. Generating a feature importance plot.
-8. Saving the trained pipeline to `models/model.pkl`.
+1. Loads and validates the dataset.
+2. Selects the six input features and `SalePrice` target.
+3. Handles missing numerical feature values using median imputation.
+4. Splits the data into training and test sets.
+5. Trains the Random Forest regressor.
+6. Evaluates predictions on the held-out test set.
+7. Generates a feature importance plot.
+8. Saves the trained pipeline to `models/model.pkl`.
+9. Saves evaluation metrics to `models/random_forest_metrics.json`.
 
 Training configuration:
 
@@ -80,7 +81,7 @@ Architecture:
 
 The implementation includes:
 
-- He-style weight initialization for the ReLU hidden layers
+- He-style weight initialization for ReLU hidden layers
 - Mini-batch gradient descent
 - Mean squared error loss
 - Feature and target standardization
@@ -89,22 +90,27 @@ The implementation includes:
 - Model parameter serialization in NumPy's `.npz` format
 - Input and artifact validation during inference
 
-The neural network training workflow uses separate training, validation, and test subsets. Scaling parameters are calculated from the training subset to avoid using validation or test information during preprocessing.
+The training workflow uses separate training, validation, and test subsets. Scaling parameters are calculated from the training subset to avoid using validation or test information during preprocessing.
 
-The trained network is saved to `models/neural_network.npz`.
+The trained model is saved to `models/neural_network.npz`, and its evaluation metrics are saved to `models/neural_network_metrics.json`.
 
 ## Model Performance
 
-The following results are from the current recorded model runs.
+The following results are from the latest recorded training runs in the development environment.
 
 | Metric | Random Forest | Neural Network |
 |---|---:|---:|
 | Test R² | 0.8889 | 0.8678 |
 | Test RMSE | $29,190.00 | $31,844.77 |
+| Test MAE | $19,169.85 | $20,275.19 |
 
-Both models were evaluated using the same 20% held-out test split with `random_state = 42`. The neural network uses an additional validation subset drawn from the training portion.
+Both models use the same 20% held-out test split with `random_state = 42`. The neural network additionally uses a validation subset drawn from the training portion.
 
-The Random Forest currently has the higher recorded R² and lower RMSE. These results describe performance on this dataset and split; they do not establish that the same model will perform better on every dataset.
+The Random Forest has the better recorded R² and lower RMSE and MAE in these runs. These results describe performance on this dataset and split; they do not establish that the same model will perform better on every dataset.
+
+The training scripts save the evaluation metrics as JSON files. The Streamlit application loads the metrics associated with each model artifact instead of relying on hard-coded evaluation values. Each metrics file includes a SHA-256 digest of its model artifact, allowing the application to reject metrics that no longer match the corresponding model file.
+
+If evaluation metrics are missing or do not match their model artifact, the application can still make predictions when the model itself is available, but it warns that the evaluation metrics are unavailable or outdated.
 
 ### R² Score
 
@@ -112,22 +118,30 @@ R² measures how much variation in the target values is explained by a model rel
 
 ### Root Mean Squared Error
 
-RMSE measures prediction error in the target's units—in this case, dollars. It penalizes larger errors more heavily than smaller ones. Individual prediction errors can be substantially larger or smaller than the RMSE.
+RMSE measures prediction error in the target's units—in this case, dollars. It penalizes larger errors more heavily than smaller ones.
+
+### Mean Absolute Error
+
+MAE measures the average absolute difference between predicted and actual sale prices. It is expressed in dollars and is less sensitive to large individual errors than RMSE.
 
 ## Baseline Comparison
 
-The neural network training script also evaluates a simple baseline that predicts the mean sale price of the training subset for every test example.
+The neural network training script also evaluates a baseline that predicts the mean sale price of the training subset for every test example.
+
+Latest recorded baseline results:
 
 | Metric | Mean Baseline |
 |---|---:|
 | Test R² | -0.0008 |
 | Test RMSE | $87,613.78 |
 
-The neural network substantially outperforms this baseline on the recorded test split. A baseline provides useful context because it shows whether a trained model improves on a simple prediction strategy.
+The neural network substantially outperforms this baseline on the recorded test split. A baseline provides useful context by showing whether a trained model improves on a simple prediction strategy.
 
 ## Random Forest Feature Importance
 
-The Random Forest model produces the following feature importance values:
+The Random Forest model generates a feature importance visualization saved to `feature_importance.png`.
+
+Latest recorded feature importance values:
 
 | Feature | Importance |
 |---|---:|
@@ -142,7 +156,7 @@ Overall quality has the highest feature importance in the trained Random Forest,
 
 Feature importance measures how the fitted Random Forest uses features to reduce impurity. It does not establish causation and should not be interpreted as the effect of changing a property characteristic.
 
-The generated visualization is saved to `feature_importance.png`.
+These figures reflect a particular training run and may change when the data, features, or model configuration changes.
 
 ## Streamlit Application
 
@@ -153,18 +167,20 @@ The application provides:
 - Random Forest and neural network prediction options
 - Input controls for all six features
 - Estimated sale price
-- Recorded model performance metrics
+- Model evaluation metrics loaded from saved JSON files
 - Random Forest feature importance visualization
 - Project information and model descriptions
 - Model-loading and prediction error handling
+- Warnings when evaluation metrics are missing or do not match their model artifacts
 
-The Random Forest and neural network artifacts are stored separately, allowing either model to be loaded independently.
+The two model artifacts and their evaluation metrics are stored separately, allowing each model to be loaded and evaluated independently.
 
 ## Project Structure
 
 ```text
 house-price-prediction/
 ├── app.py
+├── model_metrics.py
 ├── train.py
 ├── neural_network.py
 ├── train_neural_network.py
@@ -176,10 +192,14 @@ house-price-prediction/
 │   └── train.csv
 ├── models/
 │   ├── model.pkl
-│   └── neural_network.npz
+│   ├── random_forest_metrics.json
+│   ├── neural_network.npz
+│   └── neural_network_metrics.json
 └── tests/
     └── test_app.py
 ```
+
+Generated model artifacts and evaluation metrics are produced by the training scripts. The dataset must be available separately at `data/train.csv`.
 
 ## Technologies
 
@@ -199,16 +219,16 @@ This project uses the **House Prices: Advanced Regression Techniques** dataset f
 
 The dataset contains residential property information from Ames, Iowa, including property quality, size, construction characteristics, and other attributes.
 
-The expected training file is `data/train.csv`. The dataset is not recreated by the training scripts; obtain it from the original dataset source if it is not already present.
+The expected training file is `data/train.csv`. The training scripts do not download or recreate the dataset. Obtain it from the original [Kaggle dataset](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques/data) if it is not already present.
+
+The dataset must contain the six selected features and the `SalePrice` target.
 
 ## How to Run the Project
 
 ### 1. Clone the repository
 
-Replace the placeholder with the actual repository URL.
-
 ```bash
-git clone YOUR_REPOSITORY_URL
+git clone https://github.com/Parisa-lab/house-price-prediction.git
 cd house-price-prediction
 ```
 
@@ -228,7 +248,7 @@ Place the Kaggle training file at:
 data/train.csv
 ```
 
-The dataset must contain the six selected features and the `SalePrice` target.
+Ensure that the file contains all six selected features and the `SalePrice` target.
 
 ### 4. Train the Random Forest model
 
@@ -236,11 +256,15 @@ The dataset must contain the six selected features and the `SalePrice` target.
 python train.py
 ```
 
-This command trains and evaluates the Random Forest pipeline, generates the feature importance plot, and saves the model to:
+This command trains and evaluates the Random Forest pipeline, generates the feature importance plot, and saves the following artifacts:
 
 ```text
 models/model.pkl
+models/random_forest_metrics.json
+feature_importance.png
 ```
+
+The metrics JSON records the evaluation results, test configuration, model details, and SHA-256 digest of the saved model artifact.
 
 ### 5. Train the neural network
 
@@ -248,11 +272,14 @@ models/model.pkl
 python train_neural_network.py
 ```
 
-This command validates the selected data, creates training, validation, and test subsets, trains the neural network, evaluates its performance against the mean baseline, and saves the artifact to:
+This command validates the selected data, creates training, validation, and test subsets, trains the neural network, evaluates its performance against the mean baseline, and saves:
 
 ```text
 models/neural_network.npz
+models/neural_network_metrics.json
 ```
+
+The metrics file is associated with the exact saved neural network artifact.
 
 ### 6. Run automated tests
 
@@ -262,15 +289,15 @@ Install Pytest if it is not already available:
 python -m pip install pytest
 ```
 
-Then run the test suite from the repository root:
+Run the test suite from the repository root:
 
 ```bash
 python -m pytest -v
 ```
 
-The tests check model artifacts, feature order, finite predictions, Random Forest feature importances, neural network input validation, and missing-model handling.
+The current development test suite has passed all 12 tests. The tests cover model artifacts, feature order, finite predictions, Random Forest feature importances, neural network input validation, missing-model handling, and evaluation-metrics persistence and validation.
 
-The current test suite has passed all eight tests in the development environment. Results can vary if the dependencies or model artifacts change.
+Test results may vary if the source code, dependencies, or model artifacts change.
 
 ### 7. Run the Streamlit application
 
@@ -279,6 +306,8 @@ python -m streamlit run app.py
 ```
 
 The application will display a local URL in the terminal. Open that URL in your browser.
+
+The application expects the model artifacts to exist in the `models/` directory. If evaluation metrics are missing or invalid, retrain the relevant model using its training script.
 
 ## Limitations
 
@@ -310,9 +339,7 @@ Predictions are intended for educational and portfolio purposes. They are not pr
 - Continuous integration and deployment
 - Monitoring for changes in data and model performance
 
-## Portfolio Project
-
-This project demonstrates two approaches to regression and the steps required to turn trained models into an interactive application.
+## Portfolio Project Workflow
 
 ```text
 Dataset
@@ -321,19 +348,21 @@ Feature Selection and Validation
    |
 Train / Validation / Test Splits
    |
-   +-----------------------+
-   |                       |
+   +-------------------------+
+   |                         |
 Random Forest          NumPy Neural Network
-   |                       |
-Evaluation             Evaluation
-   |                       |
-Saved Pipeline         Saved Parameters
-   |                       |
-   +-----------+-----------+
-               |
-        Streamlit Application
-               |
-        Interactive Predictions
+   |                         |
+Evaluation              Evaluation
+   |                         |
+Saved Pipeline          Saved Parameters
+   |                         |
+Saved Metrics           Saved Metrics
+   |                         |
+   +------------+------------+
+                |
+       Streamlit Application
+                |
+      Interactive Predictions
 ```
 
 ## Author

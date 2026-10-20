@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "model_name": "neural_network",
+  "target": "SalePrice",
+  "features": [
+    "OverallQual",
+    "GrLivArea",
+    "GarageCars",
+    "TotalBsmtSF",
+    "FullBath",
+    "YearBuilt"
+  ],
+  "test_samples": 292,
+  "evaluation": {
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "metrics": {
+    "mae": 20275.190413653996,
+    "rmse": 31844.770485235007,
+    "r2": 0.8677905763242392
+  },
+  "artifact_sha256": "ee7cad708cb85f58a0f97f40bb56bc06eb7cc9a523088edcd3ba5f78499021d5"
+}

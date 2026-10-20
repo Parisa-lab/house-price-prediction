@@ -1,12 +1,13 @@
 
 """Streamlit app for Random Forest and neural-network house-price prediction."""
 
-from pathlib import Path
 import pickle
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
+from model_metrics import load_model_metrics
 from neural_network import FEATURES, load_model as load_neural_network_model
 from neural_network import predict_price as predict_neural_network_price
 
@@ -27,7 +28,10 @@ st.set_page_config(
 # ============================================================
 
 RANDOM_FOREST_PATH = Path("models/model.pkl")
+RANDOM_FOREST_METRICS_PATH = Path("models/random_forest_metrics.json")
+
 NEURAL_NETWORK_PATH = Path("models/neural_network.npz")
+NEURAL_NETWORK_METRICS_PATH = Path("models/neural_network_metrics.json")
 
 FEATURE_LABELS = {
     "OverallQual": "Overall Quality",
@@ -38,15 +42,6 @@ FEATURE_LABELS = {
     "YearBuilt": "Year Built",
 }
 
-# Existing Random Forest metrics. Their test split has not yet been
-# verified against the neural network's shared test split.
-RANDOM_FOREST_R2 = 0.8889
-RANDOM_FOREST_RMSE = 29190.0
-
-# Metrics from the neural-network training run in this repository.
-NEURAL_NETWORK_R2 = 0.8678
-NEURAL_NETWORK_RMSE = 31844.77
-
 
 # ============================================================
 # 3. MODEL LOADING
@@ -54,7 +49,7 @@ NEURAL_NETWORK_RMSE = 31844.77
 
 @st.cache_resource
 def load_random_forest(model_path: str, modified_time: float):
-    """Load the existing serialized Random Forest pipeline."""
+    """Load the serialized Random Forest pipeline."""
     del modified_time  # Included in the cache key to detect file changes.
 
     with open(model_path, "rb") as file:
@@ -67,6 +62,46 @@ def load_neural_network(model_path: str, modified_time: float):
     del modified_time  # Included in the cache key to detect file changes.
 
     return load_neural_network_model(model_path)
+
+
+@st.cache_data
+def load_evaluation_metrics(
+    metrics_path: str,
+    artifact_path: str,
+    metrics_modified_time: float,
+    artifact_modified_time: float,
+    expected_model_name: str,
+):
+    """Load metrics associated with the current model artifact."""
+    # Timestamps are cache keys; validation is performed by the utility.
+    del metrics_modified_time, artifact_modified_time
+
+    return load_model_metrics(
+        metrics_path,
+        artifact_path,
+        expected_model_name=expected_model_name,
+    )
+
+
+def get_evaluation_metrics(
+    metrics_path: Path,
+    artifact_path: Path,
+    model_name: str,
+):
+    """Load metrics when both files exist and match the current artifact."""
+    if not metrics_path.is_file() or not artifact_path.is_file():
+        return None
+
+    try:
+        return load_evaluation_metrics(
+            str(metrics_path),
+            str(artifact_path),
+            metrics_path.stat().st_mtime,
+            artifact_path.stat().st_mtime,
+            model_name,
+        )
+    except (OSError, ValueError, TypeError):
+        return None
 
 
 # ============================================================
@@ -137,7 +172,32 @@ else:
 
 
 # ============================================================
-# 6. HEADER AND MODEL SELECTION
+# 6. LOAD MODEL-SPECIFIC METRICS
+# ============================================================
+
+random_forest_metrics = (
+    get_evaluation_metrics(
+        RANDOM_FOREST_METRICS_PATH,
+        RANDOM_FOREST_PATH,
+        "random_forest",
+    )
+    if random_forest is not None
+    else None
+)
+
+neural_network_metrics = (
+    get_evaluation_metrics(
+        NEURAL_NETWORK_METRICS_PATH,
+        NEURAL_NETWORK_PATH,
+        "neural_network",
+    )
+    if neural_network is not None
+    else None
+)
+
+
+# ============================================================
+# 7. HEADER AND MODEL SELECTION
 # ============================================================
 
 st.title("House Price Predictor")
@@ -188,7 +248,7 @@ else:
 
 
 # ============================================================
-# 7. PROPERTY INPUTS
+# 8. PROPERTY INPUTS
 # ============================================================
 
 st.header("Property Details")
@@ -261,7 +321,7 @@ input_data = pd.DataFrame(
 
 
 # ============================================================
-# 8. PREDICTION
+# 9. PREDICTION
 # ============================================================
 
 st.divider()
@@ -291,41 +351,60 @@ if st.button("Predict House Price", use_container_width=True):
 
 
 # ============================================================
-# 9. MODEL PERFORMANCE
+# 10. MODEL PERFORMANCE
 # ============================================================
 
 st.divider()
 st.header("Model Performance")
 
 if selected_model == "Random Forest":
-    performance_r2 = RANDOM_FOREST_R2
-    performance_rmse = RANDOM_FOREST_RMSE
+    performance_metrics = random_forest_metrics
 else:
-    performance_r2 = NEURAL_NETWORK_R2
-    performance_rmse = NEURAL_NETWORK_RMSE
+    performance_metrics = neural_network_metrics
 
-metric_col1, metric_col2 = st.columns(2)
+if performance_metrics is None:
+    st.warning(
+        "Evaluation metrics are unavailable or do not match the current "
+        "model artifact. Predictions can still work. Run the appropriate "
+        "training script to generate fresh metrics."
+    )
 
-with metric_col1:
-    st.metric("R² Score", f"{performance_r2:.4f}")
+    if selected_model == "Random Forest":
+        st.code("python train.py", language="bash")
+    else:
+        st.code("python train_neural_network.py", language="bash")
 
-with metric_col2:
-    st.metric("RMSE", f"${performance_rmse:,.2f}")
+else:
+    saved_metrics = performance_metrics["metrics"]
+    evaluation = performance_metrics["evaluation"]
+    test_samples = performance_metrics["test_samples"]
 
-st.write(
-    f"The displayed R² score is **{performance_r2 * 100:.1f}%** "
-    "when expressed as a percentage."
-)
+    metric_col1, metric_col2 = st.columns(2)
 
-st.caption(
-    "The displayed metrics come from separate recorded training runs. "
-    "Do not interpret differences between the models as a controlled "
-    "comparison until both are evaluated on the exact same test rows."
-)
+    with metric_col1:
+        st.metric("R² Score", f"{saved_metrics['r2']:.4f}")
+
+    with metric_col2:
+        st.metric("RMSE", f"${saved_metrics['rmse']:,.2f}")
+
+    st.metric("Mean Absolute Error (MAE)", f"${saved_metrics['mae']:,.2f}")
+
+    st.write(
+        f"The R² score is **{saved_metrics['r2'] * 100:.1f}%** "
+        "when expressed as a percentage."
+    )
+
+    st.caption(
+        f"Evaluated on {test_samples:,} held-out samples. "
+        f"Test split: {evaluation['test_size']:.0%}; "
+        f"random state: {evaluation['random_state']}. "
+        "Metrics are loaded from the saved evaluation file and validated "
+        "against the current model artifact."
+    )
 
 
 # ============================================================
-# 10. RANDOM FOREST FEATURE IMPORTANCE
+# 11. RANDOM FOREST FEATURE IMPORTANCE
 # ============================================================
 
 if random_forest is not None:
@@ -363,7 +442,7 @@ if random_forest is not None:
 
 
 # ============================================================
-# 11. ABOUT THE PROJECT
+# 12. ABOUT THE PROJECT
 # ============================================================
 
 st.divider()
@@ -389,7 +468,7 @@ Both models use the following six property features:
 
 
 # ============================================================
-# 12. DISCLAIMER
+# 13. DISCLAIMER
 # ============================================================
 
 st.divider()

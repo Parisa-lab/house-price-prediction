@@ -1,10 +1,10 @@
-
-"""Automated tests for the house-price prediction models.
+"""Automated tests for the house-price prediction project.
 
 Run from the repository root:
     python -m pytest -v
 """
 
+import json
 import pickle
 from pathlib import Path
 
@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from model_metrics import load_model_metrics, save_model_metrics
 from neural_network import (
     FEATURES,
     load_model as load_neural_network,
@@ -37,6 +38,12 @@ SAMPLE_INPUT = pd.DataFrame(
     columns=FEATURES,
 )
 
+SAMPLE_METRICS = {
+    "mae": 20_000.0,
+    "rmse": 30_000.0,
+    "r2": 0.85,
+}
+
 
 @pytest.fixture(scope="module")
 def random_forest():
@@ -57,6 +64,29 @@ def neural_network():
         pytest.skip("Neural-network model artifact is not available.")
 
     return load_neural_network(NEURAL_NETWORK_PATH)
+
+
+@pytest.fixture
+def metrics_artifacts(tmp_path):
+    """Create a temporary model artifact and its evaluation metrics."""
+    artifact_path = tmp_path / "model.pkl"
+    metrics_path = tmp_path / "metrics.json"
+
+    artifact_path.write_bytes(b"test model artifact")
+
+    save_model_metrics(
+        metrics_path,
+        artifact_path,
+        model_name="test_model",
+        target="SalePrice",
+        features=list(FEATURES),
+        metrics=SAMPLE_METRICS,
+        test_samples=100,
+        test_size=0.2,
+        random_state=42,
+    )
+
+    return metrics_path, artifact_path
 
 
 def test_random_forest_model_has_expected_pipeline(random_forest):
@@ -130,3 +160,68 @@ def test_neural_network_rejects_missing_model(tmp_path):
 
     with pytest.raises(FileNotFoundError):
         load_neural_network(missing_path)
+
+
+def test_model_metrics_save_and_load(metrics_artifacts):
+    """Verify saved metrics can be loaded for the matching artifact."""
+    metrics_path, artifact_path = metrics_artifacts
+
+    payload = load_model_metrics(
+        metrics_path,
+        artifact_path,
+        expected_model_name="test_model",
+    )
+
+    assert payload is not None
+    assert payload["schema_version"] == 1
+    assert payload["model_name"] == "test_model"
+    assert payload["target"] == "SalePrice"
+    assert payload["features"] == list(FEATURES)
+    assert payload["test_samples"] == 100
+    assert payload["evaluation"]["test_size"] == 0.2
+    assert payload["evaluation"]["random_state"] == 42
+    assert payload["metrics"] == SAMPLE_METRICS
+
+
+def test_model_metrics_reject_changed_artifact(metrics_artifacts):
+    """Reject metrics when the model artifact has changed."""
+    metrics_path, artifact_path = metrics_artifacts
+    artifact_path.write_bytes(b"updated model artifact")
+
+    payload = load_model_metrics(
+        metrics_path,
+        artifact_path,
+        expected_model_name="test_model",
+    )
+
+    assert payload is None
+
+
+def test_model_metrics_reject_wrong_model_name(metrics_artifacts):
+    """Reject metrics associated with a different model."""
+    metrics_path, artifact_path = metrics_artifacts
+
+    payload = load_model_metrics(
+        metrics_path,
+        artifact_path,
+        expected_model_name="another_model",
+    )
+
+    assert payload is None
+
+
+def test_model_metrics_reject_invalid_json(tmp_path):
+    """Return None rather than crashing on malformed metrics JSON."""
+    metrics_path = tmp_path / "metrics.json"
+    artifact_path = tmp_path / "model.pkl"
+
+    artifact_path.write_bytes(b"test model artifact")
+    metrics_path.write_text("{invalid json", encoding="utf-8")
+
+    payload = load_model_metrics(
+        metrics_path,
+        artifact_path,
+        expected_model_name="test_model",
+    )
+
+    assert payload is None
