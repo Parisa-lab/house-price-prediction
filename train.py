@@ -27,7 +27,7 @@ from model_metrics import save_model_metrics
 DATA_PATH = Path("data/train.csv")
 MODEL_PATH = Path("models/model.pkl")
 METRICS_PATH = Path("models/random_forest_metrics.json")
-PLOT_PATH = Path("feature_importance.png")
+PLOT_PATH = Path("images/feature_importance.png")
 
 TARGET = "SalePrice"
 TEST_SIZE = 0.20
