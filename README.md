@@ -147,7 +147,9 @@ The neural network substantially outperforms this baseline on the recorded test 
 
 ## Random Forest Feature Importance
 
-The Random Forest model generates a feature importance visualization saved to ![Bar chart of Random Forest feature importance for the six input features](images/feature_importance.png).
+The Random Forest model generates a feature importance visualization saved to `images/feature_importance.png`.
+
+![Bar chart of Random Forest feature importance for the six input features](images/feature_importance.png)
 
 Latest recorded feature importance values:
 
@@ -198,7 +200,7 @@ house-price-prediction/
 ├── images/
 │   ├── streamlit_random_forest.png
 │   ├── streamlit_neural_network.png
-    └── feature_importance.png
+│   └── feature_importance.png
 ├── data/
 │   └── train.csv
 ├── models/
@@ -272,7 +274,7 @@ This command trains and evaluates the Random Forest pipeline, generates the feat
 ```text
 models/model.pkl
 models/random_forest_metrics.json
-feature_importance.png
+images/feature_importance.png
 ```
 
 The metrics JSON records the evaluation results, test configuration, model details, and SHA-256 digest of the saved model artifact.
