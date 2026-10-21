@@ -147,7 +147,7 @@ The neural network substantially outperforms this baseline on the recorded test 
 
 ## Random Forest Feature Importance
 
-The Random Forest model generates a feature importance visualization saved to `feature_importance.png`.
+The Random Forest model generates a feature importance visualization saved to `images/feature_importance.png`.
 
 ![Bar chart of Random Forest feature importance for the six input features](feature_importance.png)
 
