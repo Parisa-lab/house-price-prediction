@@ -171,6 +171,7 @@ plt.xlabel("Importance")
 plt.ylabel("Feature")
 plt.tight_layout()
 
+PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
 plt.savefig(PLOT_PATH, dpi=150, bbox_inches="tight")
 plt.close()
 
