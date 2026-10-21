@@ -14,7 +14,7 @@ The Streamlit application with the same example property entered for each model:
 
 | Random Forest | Neural Network |
 |:---:|:---:|
-| ![Streamlit app with the Random Forest model selected, showing the property inputs, the estimated sale price and the model's evaluation metrics](streamlit_random_forest.png) | ![Streamlit app with the Neural Network model selected, showing the property inputs, the estimated sale price and the model's evaluation metrics](streamlit_neural_network.png) |
+| ![Streamlit app with the Random Forest model selected, showing the property inputs, the estimated sale price and the model's evaluation metrics](images/streamlit_random_forest.png) | ![Streamlit app with the Neural Network model selected, showing the property inputs, the estimated sale price and the model's evaluation metrics](images/streamlit_neural_network.png) |
 
 Example property: overall quality 5, living area 1,500 sq ft, garage capacity 2, basement area 800 sq ft, 2 full bathrooms, built in 2000. Beneath each estimate, the app shows the recorded test-set metrics of the selected model.
 
