@@ -198,8 +198,9 @@ house-price-prediction/
 ├── README.md
 ├── .gitignore
 ├── feature_importance.png
-├── streamlit_random_forest.png
-├── streamlit_neural_network.png
+├── images/
+│   ├── streamlit_random_forest.png
+│   └── streamlit_neural_network.png
 ├── data/
 │   └── train.csv
 ├── models/
