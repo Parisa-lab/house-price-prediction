@@ -8,7 +8,15 @@ Try the deployed Streamlit application:
 
 [House Price Prediction — Streamlit](https://house-price-prediction-vrtvevjqxqm7yuhvyx7z7v.streamlit.app/)
 
-**Deployment status:** The live deployment may not yet contain the latest integrated application and evaluation-metrics changes. The updated code must be pushed and successfully redeployed before the live demo can be considered current.
+## Screenshots
+
+The Streamlit application with the same example property entered for each model:
+
+| Random Forest | Neural Network |
+|:---:|:---:|
+| ![Streamlit app with the Random Forest model selected, showing the property inputs, the estimated sale price and the model's evaluation metrics](streamlit_random_forest.png) | ![Streamlit app with the Neural Network model selected, showing the property inputs, the estimated sale price and the model's evaluation metrics](streamlit_neural_network.png) |
+
+Example property: overall quality 5, living area 1,500 sq ft, garage capacity 2, basement area 800 sq ft, 2 full bathrooms, built in 2000. Beneath each estimate, the app shows the recorded test-set metrics of the selected model.
 
 ## Overview
 
@@ -141,6 +149,8 @@ The neural network substantially outperforms this baseline on the recorded test 
 
 The Random Forest model generates a feature importance visualization saved to `feature_importance.png`.
 
+![Bar chart of Random Forest feature importance for the six input features](feature_importance.png)
+
 Latest recorded feature importance values:
 
 | Feature | Importance |
@@ -168,7 +178,7 @@ The application provides:
 - Input controls for all six features
 - Estimated sale price
 - Model evaluation metrics loaded from saved JSON files
-- Random Forest feature importance visualization
+- Random Forest feature importance chart, shown below the metrics whichever model is selected (the neural network has no feature-importance view)
 - Project information and model descriptions
 - Model-loading and prediction error handling
 - Warnings when evaluation metrics are missing or do not match their model artifacts
@@ -188,6 +198,8 @@ house-price-prediction/
 ├── README.md
 ├── .gitignore
 ├── feature_importance.png
+├── streamlit_random_forest.png
+├── streamlit_neural_network.png
 ├── data/
 │   └── train.csv
 ├── models/
@@ -234,7 +246,7 @@ cd house-price-prediction
 
 ### 2. Install dependencies
 
-Use Python 3.10 or newer and install the project dependencies:
+Use Python 3.11 or newer (required by the pinned `scikit-learn==1.9.1`) and install the project dependencies:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -367,6 +379,6 @@ Saved Metrics           Saved Metrics
 
 ## Author
 
-Parisa Barzegari
+Parisa Barzegarisorkheh
 
 AI and Data Science portfolio project.
