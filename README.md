@@ -195,10 +195,10 @@ house-price-prediction/
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
-├── feature_importance.png
 ├── images/
 │   ├── streamlit_random_forest.png
-│   └── streamlit_neural_network.png
+│   ├── streamlit_neural_network.png
+    └── feature_importance.png
 ├── data/
 │   └── train.csv
 ├── models/
